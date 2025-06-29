@@ -11,7 +11,6 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            requestAnimationFrame(gameLoop);
         }
         
         body {
@@ -209,7 +208,7 @@
             display: none;
         }
         
-        .pause-overlay {
+        .overlay {
             position: fixed;
             top: 0;
             left: 0;
@@ -220,13 +219,171 @@
             justify-content: center;
             align-items: center;
             z-index: 150;
+            flex-direction: column;
+            gap: 20px;
         }
         
-        .pause-text {
+        .overlay-content {
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid #ff0080;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 30px #ff0080;
+        }
+        
+        .overlay-title {
             font-size: 48px;
             color: #ff0080;
             text-shadow: 0 0 20px #ff0080;
             animation: pulse 2s infinite;
+            margin-bottom: 20px;
+        }
+        
+        .overlay-text {
+            font-size: 24px;
+            color: #00ffff;
+            margin: 10px 0;
+        }
+        
+        .overlay-button {
+            background: rgba(0, 255, 255, 0.2);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            color: #00ffff;
+            font-family: 'Orbitron', monospace;
+            font-size: 16px;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .overlay-button:hover {
+            background: rgba(0, 255, 255, 0.4);
+            box-shadow: 0 0 15px #00ffff;
+        }
+        
+        .options-menu {
+            max-width: 400px;
+            text-align: left;
+        }
+        
+        .option-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+        }
+        
+        .option-item:last-child {
+            border-bottom: none;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .toggle-switch.active {
+            background: #00ffff;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(26px);
+        }
+        
+        .achievement-ladder {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .achievement-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            margin: 2px 0;
+            border-radius: 4px;
+            font-size: 10px;
+            transition: all 0.3s;
+        }
+        
+        .achievement-item.unlocked {
+            background: rgba(0, 255, 0, 0.2);
+            border-left: 3px solid #00ff00;
+        }
+        
+        .achievement-item.locked {
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 3px solid #555;
+            opacity: 0.6;
+        }
+        
+        .achievement-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin-top: 2px;
+        }
+        
+        .achievement-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0080, #00ffff);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+        
+        .leaderboard-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            font-size: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .leaderboard-entry.current {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .options-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            color: #00ffff;
+            font-family: 'Orbitron', monospace;
+            font-size: 14px;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .options-button:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 15px #00ffff;
         }
         
         @keyframes pulse {
@@ -265,11 +422,20 @@
                 max-width: 100vw;
                 max-height: 60vh;
             }
+            
+            .options-button {
+                top: 10px;
+                left: 10px;
+                font-size: 12px;
+                padding: 8px 12px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="scanlines"></div>
+    
+    <button class="options-button" id="optionsButton">⚙️ OPTIONS</button>
     
     <div class="game-container">
         <div class="info-panel">
@@ -291,20 +457,25 @@
                     Combo: <span id="combo">0</span>
                 </div>
             </div>
-            <div class="panel">
-                <h3>Next Options</h3>
-                <div style="display: flex; gap: 5px;">
-                    <canvas class="next-piece" id="nextCanvas1" width="60" height="60" style="cursor: pointer; border: 2px solid #00ffff;"></canvas>
-                    <canvas class="next-piece" id="nextCanvas2" width="60" height="60" style="cursor: pointer; border: 2px solid #555;"></canvas>
-                </div>
-                <div style="font-size: 10px; color: #888; margin-top: 5px; text-align: center;">
-                    Click to choose
-                </div>
+            <div class="panel" id="nextPanel">
+                <h3>Next</h3>
+                <canvas class="next-piece" id="nextCanvas" width="60" height="60"></canvas>
             </div>
         </div>
         
         <div class="game-board">
             <canvas id="gameCanvas" width="300" height="600"></canvas>
+        </div>
+        
+        <div class="info-panel">
+            <div class="panel">
+                <h3>Achievement Ladder</h3>
+                <div class="achievement-ladder" id="achievementLadder"></div>
+            </div>
+            <div class="panel">
+                <h3>Leaderboard</h3>
+                <div id="leaderboard"></div>
+            </div>
         </div>
     </div>
     
@@ -332,6 +503,10 @@
             <span>Pause:</span>
             <span class="key">P</span>
         </div>
+        <div class="control-item">
+            <span>Options:</span>
+            <span class="key">O</span>
+        </div>
     </div>
     
     <div class="mobile-controls">
@@ -344,8 +519,64 @@
     
     <div class="item-notification" id="itemNotification"></div>
     <div class="item-notification" id="achievementNotification" style="background: rgba(0, 255, 0, 0.9); border-color: #00ff00; box-shadow: 0 0 30px #00ff00;"></div>
-    <div class="pause-overlay" id="pauseOverlay">
-        <div class="pause-text">PAUSED</div>
+    
+    <!-- Pause Overlay -->
+    <div class="overlay" id="pauseOverlay">
+        <div class="overlay-content">
+            <div class="overlay-title">PAUSED</div>
+            <div class="overlay-text">Press P to continue</div>
+        </div>
+    </div>
+    
+    <!-- Game Over Overlay -->
+    <div class="overlay" id="gameOverOverlay">
+        <div class="overlay-content">
+            <div class="overlay-title">GAME OVER</div>
+            <div class="overlay-text" id="finalScore">Final Score: 0</div>
+            <div class="overlay-text" id="finalLevel">Level Reached: 1</div>
+            <button class="overlay-button" onclick="restartGame()">RESTART (R)</button>
+            <button class="overlay-button" onclick="showOptions()">OPTIONS</button>
+        </div>
+    </div>
+    
+    <!-- Options Menu -->
+    <div class="overlay" id="optionsOverlay">
+        <div class="overlay-content options-menu">
+            <div class="overlay-title" style="font-size: 36px;">OPTIONS</div>
+            
+            <div class="option-item">
+                <span>Show Next Piece</span>
+                <div class="toggle-switch active" id="showNextToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+            
+            <div class="option-item">
+                <span>Show Ghost Piece</span>
+                <div class="toggle-switch active" id="showGhostToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+            
+            <div class="option-item">
+                <span>Show Grid</span>
+                <div class="toggle-switch active" id="showGridToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+            
+            <div class="option-item">
+                <span>Show Achievement Progress</span>
+                <div class="toggle-switch active" id="showAchievementsToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="overlay-button" onclick="closeOptions()">CLOSE</button>
+                <button class="overlay-button" onclick="restartGame()">RESTART GAME</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -358,6 +589,14 @@
         const ROWS = 20;
         const BLOCK_SIZE = 30;
         
+        // Game settings
+        let settings = {
+            showNext: true,
+            showGhost: true,
+            showGrid: true,
+            showAchievements: true
+        };
+        
         // Cyberpunk color palette
         const COLORS = {
             empty: 'rgba(0, 0, 0, 0.1)',
@@ -368,12 +607,11 @@
             Z: '#ff4000', // Red-Orange
             J: '#0080ff', // Blue
             L: '#ffff00', // Yellow
-            X: '#ff6600', // Orange (new X piece)
             ghost: 'rgba(255, 255, 255, 0.2)',
             item: '#ffffff'
         };
         
-        // Tetris pieces
+        // Tetris pieces (removed X piece)
         const PIECES = {
             I: [
                 [[1,1,1,1]],
@@ -435,14 +673,6 @@
                 [[1,1],
                  [0,1],
                  [0,1]]
-            ],
-            X: [
-                [[0,1,0],
-                 [1,1,1],
-                 [0,1,0]],
-                [[0,1,0],
-                 [1,1,1],
-                 [0,1,0]]
             ]
         };
         
@@ -452,32 +682,49 @@
             DOUBLE_SCORE: { symbol: '⭐', name: 'Double Score', chance: 0.6 }
         };
         
+        // Achievement system with progression
+        const ACHIEVEMENT_LADDER = [
+            { id: 'firstLine', name: 'First Steps', desc: 'Clear your first line', target: 1, current: 0, type: 'lines', reward: 500, unlocked: false },
+            { id: 'speedRunner', name: 'Speed Runner', desc: 'Reach level 3', target: 3, current: 0, type: 'level', reward: 750, unlocked: false },
+            { id: 'lineBreaker', name: 'Line Breaker', desc: 'Clear 10 lines', target: 10, current: 0, type: 'lines', reward: 1000, unlocked: false },
+            { id: 'tetris', name: 'TETRIS!', desc: 'Clear 4 lines at once', target: 4, current: 0, type: 'combo', reward: 2000, unlocked: false },
+            { id: 'itemCollector', name: 'Item Hunter', desc: 'Collect 5 items', target: 5, current: 0, type: 'items', reward: 1200, unlocked: false },
+            { id: 'speedDemon', name: 'Speed Demon', desc: 'Reach level 5', target: 5, current: 0, type: 'level', reward: 1500, unlocked: false },
+            { id: 'marathon', name: 'Marathon', desc: 'Clear 50 lines', target: 50, current: 0, type: 'lines', reward: 3000, unlocked: false },
+            { id: 'perfectStart', name: 'Perfect Start', desc: '2000 points in first minute', target: 2000, current: 0, type: 'score_time', reward: 2500, unlocked: false },
+            { id: 'comboMaster', name: 'Combo Master', desc: 'Get a 6-line combo', target: 6, current: 0, type: 'combo', reward: 2500, unlocked: false },
+            { id: 'centurion', name: 'Centurion', desc: 'Clear 100 lines', target: 100, current: 0, type: 'lines', reward: 5000, unlocked: false },
+            { id: 'itemMaster', name: 'Item Master', desc: 'Collect 25 items', target: 25, current: 0, type: 'items', reward: 3500, unlocked: false },
+            { id: 'speedGod', name: 'Speed God', desc: 'Reach level 10', target: 10, current: 0, type: 'level', reward: 4000, unlocked: false },
+            { id: 'survivor', name: 'Survivor', desc: 'Play for 10 minutes', target: 600, current: 0, type: 'time', reward: 3000, unlocked: false },
+            { id: 'shapeMaster', name: 'Shape Master', desc: 'Use all pieces 10 times each', target: 10, current: 0, type: 'pieces', reward: 2500, unlocked: false },
+            { id: 'grandMaster', name: 'Grand Master', desc: 'Reach level 15', target: 15, current: 0, type: 'level', reward: 7500, unlocked: false },
+            { id: 'legend', name: 'Legend', desc: '50000 points', target: 50000, current: 0, type: 'score', reward: 10000, unlocked: false }
+        ];
+        
+        // In-memory leaderboard
+        let leaderboard = [
+            { name: 'NEXUS', score: 45000, level: 12 },
+            { name: 'CYBER', score: 38500, level: 10 },
+            { name: 'VOID', score: 32000, level: 9 },
+            { name: 'NEON', score: 28750, level: 8 },
+            { name: 'GHOST', score: 25000, level: 7 }
+        ];
+        
         let game = {
             board: [],
             currentPiece: null,
             nextPiece: null,
-            pieceOptions: [], // Two piece options to choose from
             dropTime: 0,
             dropInterval: 1000,
             paused: false,
             gameOver: false,
             activeItems: {},
-            itemDropChance: 0.3,
+            itemDropChance: 0.2,
             experience: 0,
-            levelProgress: 0,
             score: 0,
             level: 1,
             lines: 0,
-            achievements: {
-                firstLine: false,
-                tetris: false,
-                speedDemon: false,
-                itemCollector: false,
-                perfectStart: false,
-                centurion: false,
-                survivor: false,
-                shapeMaster: false
-            },
             stats: {
                 totalLines: 0,
                 totalItems: 0,
@@ -485,7 +732,7 @@
                 currentCombo: 0,
                 playtime: 0,
                 startTime: Date.now(),
-                piecesUsed: {I: 0, O: 0, T: 0, S: 0, Z: 0, J: 0, L: 0, X: 0}
+                piecesUsed: {I: 0, O: 0, T: 0, S: 0, Z: 0, J: 0, L: 0}
             }
         };
         
@@ -494,17 +741,19 @@
             // Create empty board
             game.board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
             
-            // Generate piece options but don't set current piece yet
-            generatePieceOptions();
-            game.currentPiece = null; // Wait for player selection
+            // Create first piece
+            game.currentPiece = createPiece();
+            game.nextPiece = createPiece();
+            game.dropTime = Date.now();
+            
+            // Initialize achievement progress
+            resetAchievementProgress();
+            
+            // Update UI visibility based on settings
+            updateUIVisibility();
             
             // Start game loop
             gameLoop();
-        }
-        
-        function generatePieceOptions() {
-            game.pieceOptions = [createPiece(), createPiece()];
-            drawNextPieces();
         }
         
         function createPiece() {
@@ -550,6 +799,12 @@
         }
         
         function placePiece() {
+            // Check for item collection before placing
+            checkItemCollection();
+            
+            // Track piece usage
+            game.stats.piecesUsed[game.currentPiece.type]++;
+            
             for (let y = 0; y < game.currentPiece.shape.length; y++) {
                 for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
                     if (game.currentPiece.shape[y][x]) {
@@ -565,11 +820,8 @@
             // Check for completed lines
             clearLines();
             
-            // Check for item drops (double chance)
+            // Check for item drops
             if (Math.random() < game.itemDropChance) {
-                dropItem();
-            }
-            if (Math.random() < game.itemDropChance * 0.5) { // Second chance at half probability
                 dropItem();
             }
             
@@ -579,8 +831,14 @@
             
             // Check game over
             if (!isValidMove(game.currentPiece)) {
-                game.gameOver = true;
+                triggerGameOver();
             }
+        }
+        
+        function triggerGameOver() {
+            game.gameOver = true;
+            addToLeaderboard();
+            showGameOver();
         }
         
         function clearLines() {
@@ -619,7 +877,7 @@
                 // Gain experience
                 gainExperience(linesCleared * 20 + comboBonus);
                 
-                checkAchievements();
+                updateAchievements();
                 updateDisplay();
             } else {
                 game.stats.currentCombo = 0;
@@ -649,8 +907,6 @@
         }
         
         function activateItem(itemType) {
-            const item = ITEMS[itemType];
-            
             switch(itemType) {
                 case 'CLEAR_LINE':
                     // Clear bottom line
@@ -660,7 +916,6 @@
                             game.board.unshift(Array(COLS).fill(0));
                             game.score += 50 * game.level;
                             game.stats.currentCombo++;
-                            checkAchievements();
                             break;
                         }
                     }
@@ -674,7 +929,7 @@
             }
             
             game.stats.totalItems++;
-            checkAchievements();
+            updateAchievements();
         }
         
         function showItemNotification(message) {
@@ -697,66 +952,114 @@
             }, 3000);
         }
         
-        function checkAchievements() {
-            // First Line
-            if (!game.achievements.firstLine && game.lines >= 1) {
-                game.achievements.firstLine = true;
-                game.score += 500;
-                showAchievementNotification('First Line! (+500 pts)');
-            }
-            
-            // Tetris (4 lines at once)
-            if (!game.achievements.tetris && game.stats.currentCombo >= 4) {
-                game.achievements.tetris = true;
-                game.score += 2000;
-                showAchievementNotification('TETRIS! (+2000 pts)');
-            }
-            
-            // Speed Demon (reach level 5)
-            if (!game.achievements.speedDemon && game.level >= 5) {
-                game.achievements.speedDemon = true;
-                game.score += 1500;
-                showAchievementNotification('Speed Demon! (+1500 pts)');
-            }
-            
-            // Item Collector (collect 10 items)
-            if (!game.achievements.itemCollector && game.stats.totalItems >= 10) {
-                game.achievements.itemCollector = true;
-                game.score += 1000;
-                showAchievementNotification('Item Collector! (+1000 pts)');
-            }
-            
-            // Perfect Start (100 points in first minute)
+        function resetAchievementProgress() {
+            ACHIEVEMENT_LADDER.forEach(achievement => {
+                achievement.current = 0;
+                achievement.unlocked = false;
+            });
+        }
+        
+        function updateAchievements() {
             const playtime = (Date.now() - game.stats.startTime) / 1000;
-            if (!game.achievements.perfectStart && game.score >= 1000 && playtime < 60) {
-                game.achievements.perfectStart = true;
-                game.score += 800;
-                showAchievementNotification('Perfect Start! (+800 pts)');
-            }
             
-            // Centurion (clear 100 lines)
-            if (!game.achievements.centurion && game.lines >= 100) {
-                game.achievements.centurion = true;
-                game.score += 5000;
-                showAchievementNotification('Centurion! (+5000 pts)');
-            }
-            
-            // Survivor (play for 10 minutes)
-            if (!game.achievements.survivor && playtime >= 600) {
-                game.achievements.survivor = true;
-                game.score += 3000;
-                showAchievementNotification('Survivor! (+3000 pts)');
-            }
-            
-            // Shape Master (use all 8 piece types at least 5 times each)
-            if (!game.achievements.shapeMaster) {
-                const allTypesUsed = Object.values(game.stats.piecesUsed).every(count => count >= 5);
-                if (allTypesUsed) {
-                    game.achievements.shapeMaster = true;
-                    game.score += 2500;
-                    showAchievementNotification('Shape Master! (+2500 pts)');
+            ACHIEVEMENT_LADDER.forEach(achievement => {
+                if (achievement.unlocked) return;
+                
+                let progress = 0;
+                
+                switch(achievement.type) {
+                    case 'lines':
+                        progress = game.lines;
+                        break;
+                    case 'level':
+                        progress = game.level;
+                        break;
+                    case 'combo':
+                        progress = Math.max(achievement.current, game.stats.currentCombo);
+                        break;
+                    case 'items':
+                        progress = game.stats.totalItems;
+                        break;
+                    case 'score':
+                        progress = game.score;
+                        break;
+                    case 'score_time':
+                        progress = playtime < 60 ? game.score : achievement.current;
+                        break;
+                    case 'time':
+                        progress = playtime;
+                        break;
+                    case 'pieces':
+                        progress = Math.min(...Object.values(game.stats.piecesUsed));
+                        break;
                 }
+                
+                achievement.current = Math.max(achievement.current, progress);
+                
+                if (achievement.current >= achievement.target && !achievement.unlocked) {
+                    achievement.unlocked = true;
+                    game.score += achievement.reward;
+                    showAchievementNotification(`${achievement.name}! (+${achievement.reward} pts)`);
+                }
+            });
+            
+            if (settings.showAchievements) {
+                updateAchievementDisplay();
             }
+        }
+        
+        function updateAchievementDisplay() {
+            const container = document.getElementById('achievementLadder');
+            container.innerHTML = '';
+            
+            ACHIEVEMENT_LADDER.forEach(achievement => {
+                const div = document.createElement('div');
+                div.className = `achievement-item ${achievement.unlocked ? 'unlocked' : 'locked'}`;
+                
+                const progress = Math.min(achievement.current / achievement.target, 1) * 100;
+                
+                div.innerHTML = `
+                    <div>
+                        <div style="font-weight: bold;">${achievement.name}</div>
+                        <div style="font-size: 8px; opacity: 0.8;">${achievement.desc}</div>
+                        <div class="achievement-progress">
+                            <div class="achievement-progress-bar" style="width: ${progress}%"></div>
+                        </div>
+                    </div>
+                    <div style="color: #00ff00;">+${achievement.reward}</div>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+        
+        function addToLeaderboard() {
+            const playerEntry = {
+                name: 'YOU',
+                score: game.score,
+                level: game.level
+            };
+            
+            leaderboard.push(playerEntry);
+            leaderboard.sort((a, b) => b.score - a.score);
+            leaderboard = leaderboard.slice(0, 10); // Keep top 10
+            
+            updateLeaderboardDisplay();
+        }
+        
+        function updateLeaderboardDisplay() {
+            const container = document.getElementById('leaderboard');
+            container.innerHTML = '';
+            
+            leaderboard.forEach((entry, index) => {
+                const div = document.createElement('div');
+                div.className = `leaderboard-entry ${entry.name === 'YOU' ? 'current' : ''}`;
+                div.innerHTML = `
+                    <span>#${index + 1} ${entry.name}</span>
+                    <span>L${entry.level} • ${entry.score.toLocaleString()}</span>
+                `;
+                container.appendChild(div);
+            });
         }
         
         function gainExperience(amount) {
@@ -773,7 +1076,7 @@
                 game.score += levelBonus;
                 showAchievementNotification(`Level Up! +${levelBonus} pts`);
                 
-                checkAchievements();
+                updateAchievements();
             }
         }
         
@@ -833,25 +1136,45 @@
             return ghostY;
         }
         
+        function drawBlock(x, y, color, alpha = 1) {
+            // Main block
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = color;
+            ctx.fillRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+            
+            // Glow effect
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+            
+            // Reset shadow
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+        }
+        
         function draw() {
             // Clear canvas
             ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Draw grid
-            ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
-            ctx.lineWidth = 1;
-            for (let x = 0; x <= COLS; x++) {
-                ctx.beginPath();
-                ctx.moveTo(x * BLOCK_SIZE, 0);
-                ctx.lineTo(x * BLOCK_SIZE, canvas.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y <= ROWS; y++) {
-                ctx.beginPath();
-                ctx.moveTo(0, y * BLOCK_SIZE);
-                ctx.lineTo(canvas.width, y * BLOCK_SIZE);
-                ctx.stroke();
+            // Draw grid (if enabled)
+            if (settings.showGrid) {
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+                ctx.lineWidth = 1;
+                for (let x = 0; x <= COLS; x++) {
+                    ctx.beginPath();
+                    ctx.moveTo(x * BLOCK_SIZE, 0);
+                    ctx.lineTo(x * BLOCK_SIZE, canvas.height);
+                    ctx.stroke();
+                }
+                for (let y = 0; y <= ROWS; y++) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y * BLOCK_SIZE);
+                    ctx.lineTo(canvas.width, y * BLOCK_SIZE);
+                    ctx.stroke();
+                }
             }
             
             // Draw placed blocks
@@ -875,25 +1198,14 @@
                                 y * BLOCK_SIZE + BLOCK_SIZE/2 + 7);
                         } else {
                             // Draw regular block
-                            ctx.fillStyle = COLORS[game.board[y][x]];
-                            ctx.fillRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
-                            
-                            // Glow effect
-                            ctx.shadowColor = COLORS[game.board[y][x]];
-                            ctx.shadowBlur = 10;
-                            ctx.strokeStyle = COLORS[game.board[y][x]];
-                            ctx.lineWidth = 2;
-                            ctx.strokeRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
-                            
-                            // Reset shadow
-                            ctx.shadowBlur = 0;
+                            drawBlock(x, y, COLORS[game.board[y][x]]);
                         }
                     }
                 }
             }
             
-            // Draw ghost piece
-            if (game.currentPiece) {
+            // Draw ghost piece (if enabled)
+            if (settings.showGhost && game.currentPiece) {
                 const ghostY = getGhostPosition();
                 if (ghostY !== game.currentPiece.y) {
                     for (let y = 0; y < game.currentPiece.shape.length; y++) {
@@ -921,76 +1233,50 @@
                             const blockX = game.currentPiece.x + x;
                             const blockY = game.currentPiece.y + y;
                             if (blockY >= 0) {
-                                let alpha = game.activeItems.GHOST_PIECE ? 0.5 : 1;
-                                drawBlock(blockX, blockY, COLORS[game.currentPiece.type], alpha);
+                                drawBlock(blockX, blockY, COLORS[game.currentPiece.type]);
                             }
                         }
                     }
                 }
             }
-            
-            // Draw next pieces
-            drawNextPieces();
         }
         
-        function drawNextPieces() {
-            const canvas1 = document.getElementById('nextCanvas1');
-            const canvas2 = document.getElementById('nextCanvas2');
-            const ctx1 = canvas1.getContext('2d');
-            const ctx2 = canvas2.getContext('2d');
+        function drawNextPiece() {
+            if (!settings.showNext) return;
             
-            // Draw both piece options
-            [ctx1, ctx2].forEach((ctx, index) => {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-                ctx.fillRect(0, 0, 60, 60);
+            nextCtx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+            nextCtx.fillRect(0, 0, 60, 60);
+            
+            if (game.nextPiece) {
+                const piece = game.nextPiece;
+                const blockSize = Math.min(
+                    Math.floor(50 / Math.max(piece.shape[0].length, piece.shape.length)),
+                    12
+                );
+                const offsetX = (60 - piece.shape[0].length * blockSize) / 2;
+                const offsetY = (60 - piece.shape.length * blockSize) / 2;
                 
-                if (game.pieceOptions[index]) {
-                    const piece = game.pieceOptions[index];
-                    const blockSize = Math.min(
-                        Math.floor(50 / Math.max(piece.shape[0].length, piece.shape.length)),
-                        12
-                    );
-                    const offsetX = (60 - piece.shape[0].length * blockSize) / 2;
-                    const offsetY = (60 - piece.shape.length * blockSize) / 2;
-                    
-                    for (let y = 0; y < piece.shape.length; y++) {
-                        for (let x = 0; x < piece.shape[y].length; x++) {
-                            if (piece.shape[y][x]) {
-                                ctx.fillStyle = COLORS[piece.type];
-                                ctx.fillRect(
-                                    offsetX + x * blockSize, 
-                                    offsetY + y * blockSize, 
-                                    blockSize - 1, 
-                                    blockSize - 1
-                                );
-                                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                                ctx.strokeRect(
-                                    offsetX + x * blockSize, 
-                                    offsetY + y * blockSize, 
-                                    blockSize - 1, 
-                                    blockSize - 1
-                                );
-                            }
+                for (let y = 0; y < piece.shape.length; y++) {
+                    for (let x = 0; x < piece.shape[y].length; x++) {
+                        if (piece.shape[y][x]) {
+                            nextCtx.fillStyle = COLORS[piece.type];
+                            nextCtx.fillRect(
+                                offsetX + x * blockSize, 
+                                offsetY + y * blockSize, 
+                                blockSize - 1, 
+                                blockSize - 1
+                            );
+                            nextCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                            nextCtx.strokeRect(
+                                offsetX + x * blockSize, 
+                                offsetY + y * blockSize, 
+                                blockSize - 1, 
+                                blockSize - 1
+                            );
                         }
                     }
                 }
-            });
-        }
-            // Main block
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = color;
-            ctx.fillRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
-            
-            // Glow effect
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 10;
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
-            
-            // Reset shadow
-            ctx.shadowBlur = 0;
-            ctx.globalAlpha = 1;
+            }
         }
         
         function updateDisplay() {
@@ -1002,6 +1288,17 @@
             document.getElementById('combo').textContent = game.stats.currentCombo;
         }
         
+        function updateUIVisibility() {
+            // Show/hide next piece panel
+            document.getElementById('nextPanel').style.display = settings.showNext ? 'block' : 'none';
+            
+            // Show/hide achievement panel
+            const achievementPanel = document.querySelector('.info-panel:last-child');
+            if (achievementPanel) {
+                achievementPanel.style.display = settings.showAchievements ? 'flex' : 'none';
+            }
+        }
+        
         function gameLoop() {
             if (!game.paused && !game.gameOver && game.currentPiece) {
                 const now = Date.now();
@@ -1009,10 +1306,7 @@
                 // Update active items
                 updateActiveItems();
                 
-                // Apply time slow effect
-                let currentDropInterval = game.dropInterval;
-                
-                if (now - game.dropTime > currentDropInterval) {
+                if (now - game.dropTime > game.dropInterval) {
                     if (isValidMove(game.currentPiece, 0, 1)) {
                         game.currentPiece.y++;
                     } else {
@@ -1020,18 +1314,110 @@
                     }
                     game.dropTime = now;
                 }
-                
-                draw();
-                updateDisplay();
-            } else if (!game.currentPiece && game.pieceOptions.length > 0) {
-                // Waiting for piece selection
-                draw();
-                updateDisplay();
-                drawNextPieces();
             }
             
-            // Event handlers
+            if (!game.gameOver) {
+                draw();
+                drawNextPiece();
+                updateDisplay();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Check for item collection
+        function checkItemCollection() {
+            if (!game.currentPiece) return;
+            
+            for (let y = 0; y < game.currentPiece.shape.length; y++) {
+                for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
+                    if (game.currentPiece.shape[y][x]) {
+                        const boardY = game.currentPiece.y + y;
+                        const boardX = game.currentPiece.x + x;
+                        
+                        if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
+                            const cell = game.board[boardY][boardX];
+                            if (cell && cell.toString().startsWith('item_')) {
+                                const itemType = cell.replace('item_', '');
+                                game.board[boardY][boardX] = 0;
+                                activateItem(itemType);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        function showGameOver() {
+            document.getElementById('finalScore').textContent = `Final Score: ${game.score.toLocaleString()}`;
+            document.getElementById('finalLevel').textContent = `Level Reached: ${game.level}`;
+            document.getElementById('gameOverOverlay').style.display = 'flex';
+        }
+        
+        function showOptions() {
+            document.getElementById('optionsOverlay').style.display = 'flex';
+            updateOptionsDisplay();
+        }
+        
+        function closeOptions() {
+            document.getElementById('optionsOverlay').style.display = 'none';
+            updateUIVisibility();
+        }
+        
+        function updateOptionsDisplay() {
+            document.getElementById('showNextToggle').className = `toggle-switch ${settings.showNext ? 'active' : ''}`;
+            document.getElementById('showGhostToggle').className = `toggle-switch ${settings.showGhost ? 'active' : ''}`;
+            document.getElementById('showGridToggle').className = `toggle-switch ${settings.showGrid ? 'active' : ''}`;
+            document.getElementById('showAchievementsToggle').className = `toggle-switch ${settings.showAchievements ? 'active' : ''}`;
+        }
+        
+        // Restart game
+        function restartGame() {
+            // Hide all overlays
+            document.getElementById('gameOverOverlay').style.display = 'none';
+            document.getElementById('optionsOverlay').style.display = 'none';
+            document.getElementById('pauseOverlay').style.display = 'none';
+            
+            game = {
+                board: [],
+                currentPiece: null,
+                nextPiece: null,
+                score: 0,
+                level: 1,
+                lines: 0,
+                dropTime: 0,
+                dropInterval: 1000,
+                paused: false,
+                gameOver: false,
+                activeItems: {},
+                itemDropChance: 0.2,
+                experience: 0,
+                stats: {
+                    totalLines: 0,
+                    totalItems: 0,
+                    maxCombo: 0,
+                    currentCombo: 0,
+                    playtime: 0,
+                    startTime: Date.now(),
+                    piecesUsed: {I: 0, O: 0, T: 0, S: 0, Z: 0, J: 0, L: 0}
+                }
+            };
+            
+            init();
+        }
+        
+        // Event handlers
         document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'r' && game.gameOver) {
+                restartGame();
+                return;
+            }
+            
+            if (e.key.toLowerCase() === 'o') {
+                showOptions();
+                return;
+            }
+            
             if (game.gameOver) return;
             
             switch(e.key.toLowerCase()) {
@@ -1064,28 +1450,29 @@
             }
         });
         
-        // Check for item collection
-        function checkItemCollection() {
-            if (!game.currentPiece) return;
-            
-            for (let y = 0; y < game.currentPiece.shape.length; y++) {
-                for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
-                    if (game.currentPiece.shape[y][x]) {
-                        const boardY = game.currentPiece.y + y;
-                        const boardX = game.currentPiece.x + x;
-                        
-                        if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
-                            const cell = game.board[boardY][boardX];
-                            if (cell && cell.toString().startsWith('item_')) {
-                                const itemType = cell.replace('item_', '');
-                                game.board[boardY][boardX] = 0;
-                                activateItem(itemType);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // Options button click
+        document.getElementById('optionsButton').addEventListener('click', showOptions);
+        
+        // Toggle switches
+        document.getElementById('showNextToggle').addEventListener('click', () => {
+            settings.showNext = !settings.showNext;
+            updateOptionsDisplay();
+        });
+        
+        document.getElementById('showGhostToggle').addEventListener('click', () => {
+            settings.showGhost = !settings.showGhost;
+            updateOptionsDisplay();
+        });
+        
+        document.getElementById('showGridToggle').addEventListener('click', () => {
+            settings.showGrid = !settings.showGrid;
+            updateOptionsDisplay();
+        });
+        
+        document.getElementById('showAchievementsToggle').addEventListener('click', () => {
+            settings.showAchievements = !settings.showAchievements;
+            updateOptionsDisplay();
+        });
         
         // Mobile controls
         document.getElementById('moveLeft').addEventListener('touchstart', (e) => {
@@ -1153,180 +1540,6 @@
                         rotate();
                     }
                 }
-            }
-        });
-        
-        function showGameOver() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.fillStyle = '#ff0080';
-            ctx.font = '48px Orbitron';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#ff0080';
-            ctx.shadowBlur = 20;
-            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
-            
-            ctx.fillStyle = '#00ffff';
-            ctx.font = '24px Orbitron';
-            ctx.shadowColor = '#00ffff';
-            ctx.shadowBlur = 10;
-            ctx.fillText('Final Score: ' + game.score.toLocaleString(), canvas.width / 2, canvas.height / 2 + 20);
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '18px Orbitron';
-            ctx.shadowBlur = 5;
-            ctx.fillText('Press R to Restart', canvas.width / 2, canvas.height / 2 + 60);
-            
-            ctx.shadowBlur = 0;
-        }
-        
-        // Prevent scrolling on mobile
-        document.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-        }, { passive: false });
-        
-        // Enhanced piece placement with item collection
-        function placePiece() {
-            // Check for item collection before placing
-            checkItemCollection();
-            
-            // Track piece usage
-            game.stats.piecesUsed[game.currentPiece.type]++;
-            
-            for (let y = 0; y < game.currentPiece.shape.length; y++) {
-                for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
-                    if (game.currentPiece.shape[y][x]) {
-                        const boardY = game.currentPiece.y + y;
-                        const boardX = game.currentPiece.x + x;
-                        if (boardY >= 0) {
-                            game.board[boardY][boardX] = game.currentPiece.type;
-                        }
-                    }
-                }
-            }
-            
-            // Check for completed lines
-            clearLines();
-            
-            // Check for item drops (double chance system)
-            if (Math.random() < game.itemDropChance) {
-                dropItem();
-            }
-            if (Math.random() < game.itemDropChance * 0.5) { // Second chance at half probability
-                dropItem();
-            }
-            
-            // Clear current piece and generate new options
-            game.currentPiece = null;
-            generatePieceOptions();
-            
-            // Reset piece selection borders
-            document.getElementById('nextCanvas1').style.borderColor = '#00ffff';
-            document.getElementById('nextCanvas2').style.borderColor = '#555';
-        }
-        
-        function selectPiece(index) {
-            if (game.gameOver || game.paused || game.currentPiece) return;
-            
-            game.currentPiece = game.pieceOptions[index];
-            
-            // Reset drop timer
-            game.dropTime = Date.now();
-            
-            // Highlight selected piece
-            updatePieceSelection(index);
-            
-            checkAchievements();
-            
-            // Check game over immediately after selection
-            if (!isValidMove(game.currentPiece)) {
-                game.gameOver = true;
-                showGameOver();
-            }
-        }
-        
-        function updatePieceSelection(selectedIndex) {
-            const canvas1 = document.getElementById('nextCanvas1');
-            const canvas2 = document.getElementById('nextCanvas2');
-            
-            if (selectedIndex === 0) {
-                canvas1.style.borderColor = '#00ff00';
-                canvas2.style.borderColor = '#555';
-            } else {
-                canvas1.style.borderColor = '#555';
-                canvas2.style.borderColor = '#00ff00';
-            }
-        }
-        
-        function showGameOver() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.fillStyle = '#ff0080';
-            ctx.font = '48px Orbitron';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#ff0080';
-            ctx.shadowBlur = 20;
-            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
-            
-            ctx.fillStyle = '#00ffff';
-            ctx.font = '24px Orbitron';
-            ctx.shadowColor = '#00ffff';
-            ctx.shadowBlur = 10;
-            ctx.fillText('Final Score: ' + game.score.toLocaleString(), canvas.width / 2, canvas.height / 2 + 20);
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '18px Orbitron';
-            ctx.shadowBlur = 5;
-            ctx.fillText('Press R to Restart', canvas.width / 2, canvas.height / 2 + 60);
-            
-            ctx.shadowBlur = 0;
-        }
-        
-        // Restart game
-        function restartGame() {
-            game = {
-                board: [],
-                currentPiece: null,
-                nextPiece: null,
-                score: 0,
-                level: 1,
-                lines: 0,
-                dropTime: 0,
-                dropInterval: 1000,
-                paused: false,
-                gameOver: false,
-                activeItems: {},
-                itemDropChance: 0.3,
-                experience: 0,
-                levelProgress: 0,
-                achievements: {
-                    firstLine: false,
-                    tetris: false,
-                    speedDemon: false,
-                    itemCollector: false,
-                    perfectStart: false,
-                    centurion: false,
-                    survivor: false
-                },
-                stats: {
-                    totalLines: 0,
-                    totalItems: 0,
-                    maxCombo: 0,
-                    currentCombo: 0,
-                    playtime: 0,
-                    startTime: Date.now()
-                }
-            };
-            
-            init();
-        }
-        
-        // Add restart functionality
-        document.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === 'r' && game.gameOver) {
-                restartGame();
             }
         });
         
@@ -1336,99 +1549,14 @@
             panel.classList.toggle('hidden');
         });
         
-        // Piece selection handlers
-        document.getElementById('nextCanvas1').addEventListener('click', () => {
-            selectPiece(0);
-        });
-        
-        document.getElementById('nextCanvas2').addEventListener('click', () => {
-            selectPiece(1);
-        });
-        
-        // Mobile piece selection
-        document.getElementById('nextCanvas1').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            selectPiece(0);
-        });
-        
-        document.getElementById('nextCanvas2').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            selectPiece(1);
-        });
-        
-        // Mobile controls
-        document.getElementById('moveLeft').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!game.paused && !game.gameOver) moveLeft();
-        });
-        
-        document.getElementById('moveRight').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!game.paused && !game.gameOver) moveRight();
-        });
-        
-        document.getElementById('rotate').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!game.paused && !game.gameOver) rotate();
-        });
-        
-        document.getElementById('softDrop').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!game.paused && !game.gameOver) softDrop();
-        });
-        
-        document.getElementById('hardDrop').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!game.paused && !game.gameOver) hardDrop();
-        });
-        
-        // Touch controls for mobile
-        let touchStartX = 0;
-        let touchStartY = 0;
-        
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-        });
-        
-        canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            if (game.paused || game.gameOver) return;
-            
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
-            
-            const dx = touchEndX - touchStartX;
-            const dy = touchEndY - touchStartY;
-            
-            const minSwipeDistance = 30;
-            
-            if (Math.abs(dx) > Math.abs(dy)) {
-                // Horizontal swipe
-                if (Math.abs(dx) > minSwipeDistance) {
-                    if (dx > 0) {
-                        moveRight();
-                    } else {
-                        moveLeft();
-                    }
-                }
-            } else {
-                // Vertical swipe
-                if (Math.abs(dy) > minSwipeDistance) {
-                    if (dy > 0) {
-                        hardDrop();
-                    } else {
-                        rotate();
-                    }
-                }
-            }
-        });
-        
         // Prevent scrolling on mobile
         document.addEventListener('touchmove', (e) => {
             e.preventDefault();
         }, { passive: false });
+        
+        // Initialize displays
+        updateAchievementDisplay();
+        updateLeaderboardDisplay();
         
         // Initialize game when page loads
         init();
