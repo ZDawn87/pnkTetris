@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyberpunk Tetris</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            requestAnimationFrame(gameLoop);
+        }
+        
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0033 50%, #000511 100%);
+            color: #00ffff;
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 255, 0.03) 2px,
+                rgba(0, 255, 255, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .game-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+        
+        .game-board {
+            position: relative;
+            border: 3px solid #ff0080;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            box-shadow: 
+                0 0 20px #ff0080,
+                inset 0 0 20px rgba(255, 0, 128, 0.1);
+        }
+        
+        #gameCanvas {
+            display: block;
+            background: rgba(0, 0, 0, 0.9);
+        }
+        
+        .info-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 200px;
+        }
+        
+        .panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+        
+        .panel h3 {
+            color: #ff0080;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        .score {
+            font-size: 24px;
+            font-weight: 700;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        
+        .level, .lines {
+            font-size: 18px;
+            color: #00ffff;
+        }
+        
+        .next-piece {
+            width: 80px;
+            height: 80px;
+            border: 1px solid #555;
+            background: rgba(0, 0, 0, 0.5);
+            margin: 10px 0;
+        }
+        
+        .controls {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #ff0080;
+            border-radius: 8px;
+            padding: 10px;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            max-width: 200px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        
+        .controls:hover {
+            opacity: 0.7;
+        }
+        
+        .controls.hidden {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        .controls h4 {
+            color: #ff0080;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+        
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .control-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+        }
+        
+        .key {
+            background: #333;
+            padding: 1px 4px;
+            border-radius: 2px;
+            border: 1px solid #666;
+            min-width: 20px;
+            text-align: center;
+            font-size: 9px;
+        }
+        
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            gap: 15px;
+            z-index: 100;
+        }
+        
+        .mobile-btn {
+            background: rgba(0, 255, 255, 0.2);
+            border: 2px solid #00ffff;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            color: #00ffff;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+        
+        .mobile-btn:active {
+            background: rgba(0, 255, 255, 0.4);
+            box-shadow: 0 0 15px #00ffff;
+            transform: scale(0.95);
+        }
+        
+        .item-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 128, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 18px;
+            z-index: 200;
+            border: 2px solid #ff0080;
+            box-shadow: 0 0 30px #ff0080;
+            display: none;
+        }
+        
+        .pause-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 150;
+        }
+        
+        .pause-text {
+            font-size: 48px;
+            color: #ff0080;
+            text-shadow: 0 0 20px #ff0080;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @media (max-width: 768px) {
+            .game-container {
+                flex-direction: column;
+                padding: 10px;
+            }
+            
+            .info-panel {
+                flex-direction: row;
+                justify-content: space-around;
+                width: 100%;
+                max-width: 400px;
+            }
+            
+            .panel {
+                flex: 1;
+                margin: 0 5px;
+                padding: 10px;
+            }
+            
+            .controls {
+                display: none;
+            }
+            
+            .mobile-controls {
+                display: flex;
+            }
+            
+            #gameCanvas {
+                max-width: 100vw;
+                max-height: 60vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+    
+    <div class="game-container">
+        <div class="info-panel">
+            <div class="panel">
+                <h3>Score</h3>
+                <div class="score" id="score">0</div>
+            </div>
+            <div class="panel">
+                <h3>Level</h3>
+                <div class="level" id="level">1</div>
+                <div style="font-size: 10px; color: #888; margin-top: 2px;">
+                    XP: <span id="experience">0</span>/<span id="expNeeded">100</span>
+                </div>
+            </div>
+            <div class="panel">
+                <h3>Lines</h3>
+                <div class="lines" id="lines">0</div>
+                <div style="font-size: 10px; color: #888; margin-top: 2px;">
+                    Combo: <span id="combo">0</span>
+                </div>
+            </div>
+            <div class="panel">
+                <h3>Next Options</h3>
+                <div style="display: flex; gap: 5px;">
+                    <canvas class="next-piece" id="nextCanvas1" width="60" height="60" style="cursor: pointer; border: 2px solid #00ffff;"></canvas>
+                    <canvas class="next-piece" id="nextCanvas2" width="60" height="60" style="cursor: pointer; border: 2px solid #555;"></canvas>
+                </div>
+                <div style="font-size: 10px; color: #888; margin-top: 5px; text-align: center;">
+                    Click to choose
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-board">
+            <canvas id="gameCanvas" width="300" height="600"></canvas>
+        </div>
+    </div>
+    
+    <div class="controls" id="controlsPanel">
+        <h4>Controls (tap to hide)</h4>
+        <div class="control-grid">
+            <div class="control-item">
+                <span>Move:</span>
+                <span><span class="key">A</span><span class="key">D</span></span>
+            </div>
+            <div class="control-item">
+                <span>Rotate:</span>
+                <span class="key">W</span>
+            </div>
+            <div class="control-item">
+                <span>Drop:</span>
+                <span class="key">S</span>
+            </div>
+            <div class="control-item">
+                <span>Slam:</span>
+                <span class="key">Space</span>
+            </div>
+        </div>
+        <div class="control-item">
+            <span>Pause:</span>
+            <span class="key">P</span>
+        </div>
+    </div>
+    
+    <div class="mobile-controls">
+        <button class="mobile-btn" id="moveLeft">◄</button>
+        <button class="mobile-btn" id="rotate">↻</button>
+        <button class="mobile-btn" id="softDrop">▼</button>
+        <button class="mobile-btn" id="moveRight">►</button>
+        <button class="mobile-btn" id="hardDrop">⬇</button>
+    </div>
+    
+    <div class="item-notification" id="itemNotification"></div>
+    <div class="item-notification" id="achievementNotification" style="background: rgba(0, 255, 0, 0.9); border-color: #00ff00; box-shadow: 0 0 30px #00ff00;"></div>
+    <div class="pause-overlay" id="pauseOverlay">
+        <div class="pause-text">PAUSED</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const nextCanvas = document.getElementById('nextCanvas');
+        const nextCtx = nextCanvas.getContext('2d');
+        
+        const COLS = 10;
+        const ROWS = 20;
+        const BLOCK_SIZE = 30;
+        
+        // Cyberpunk color palette
+        const COLORS = {
+            empty: 'rgba(0, 0, 0, 0.1)',
+            I: '#00ffff', // Cyan
+            O: '#ff0080', // Magenta
+            T: '#8000ff', // Purple
+            S: '#00ff00', // Green
+            Z: '#ff4000', // Red-Orange
+            J: '#0080ff', // Blue
+            L: '#ffff00', // Yellow
+            X: '#ff6600', // Orange (new X piece)
+            ghost: 'rgba(255, 255, 255, 0.2)',
+            item: '#ffffff'
+        };
+        
+        // Tetris pieces
+        const PIECES = {
+            I: [
+                [[1,1,1,1]],
+                [[1],
+                 [1],
+                 [1],
+                 [1]]
+            ],
+            O: [
+                [[1,1],
+                 [1,1]]
+            ],
+            T: [
+                [[0,1,0],
+                 [1,1,1]],
+                [[1,0],
+                 [1,1],
+                 [1,0]],
+                [[1,1,1],
+                 [0,1,0]],
+                [[0,1],
+                 [1,1],
+                 [0,1]]
+            ],
+            S: [
+                [[0,1,1],
+                 [1,1,0]],
+                [[1,0],
+                 [1,1],
+                 [0,1]]
+            ],
+            Z: [
+                [[1,1,0],
+                 [0,1,1]],
+                [[0,1],
+                 [1,1],
+                 [1,0]]
+            ],
+            J: [
+                [[1,0,0],
+                 [1,1,1]],
+                [[1,1],
+                 [1,0],
+                 [1,0]],
+                [[1,1,1],
+                 [0,0,1]],
+                [[0,1],
+                 [0,1],
+                 [1,1]]
+            ],
+            L: [
+                [[0,0,1],
+                 [1,1,1]],
+                [[1,0],
+                 [1,0],
+                 [1,1]],
+                [[1,1,1],
+                 [1,0,0]],
+                [[1,1],
+                 [0,1],
+                 [0,1]]
+            ],
+            X: [
+                [[0,1,0],
+                 [1,1,1],
+                 [0,1,0]],
+                [[0,1,0],
+                 [1,1,1],
+                 [0,1,0]]
+            ]
+        };
+        
+        // Power-up items
+        const ITEMS = {
+            CLEAR_LINE: { symbol: '💥', name: 'Line Clear', chance: 0.4 },
+            DOUBLE_SCORE: { symbol: '⭐', name: 'Double Score', chance: 0.6 }
+        };
+        
+        let game = {
+            board: [],
+            currentPiece: null,
+            nextPiece: null,
+            pieceOptions: [], // Two piece options to choose from
+            dropTime: 0,
+            dropInterval: 1000,
+            paused: false,
+            gameOver: false,
+            activeItems: {},
+            itemDropChance: 0.3,
+            experience: 0,
+            levelProgress: 0,
+            score: 0,
+            level: 1,
+            lines: 0,
+            achievements: {
+                firstLine: false,
+                tetris: false,
+                speedDemon: false,
+                itemCollector: false,
+                perfectStart: false,
+                centurion: false,
+                survivor: false,
+                shapeMaster: false
+            },
+            stats: {
+                totalLines: 0,
+                totalItems: 0,
+                maxCombo: 0,
+                currentCombo: 0,
+                playtime: 0,
+                startTime: Date.now(),
+                piecesUsed: {I: 0, O: 0, T: 0, S: 0, Z: 0, J: 0, L: 0, X: 0}
+            }
+        };
+        
+        // Initialize game
+        function init() {
+            // Create empty board
+            game.board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            
+            // Generate piece options but don't set current piece yet
+            generatePieceOptions();
+            game.currentPiece = null; // Wait for player selection
+            
+            // Start game loop
+            gameLoop();
+        }
+        
+        function generatePieceOptions() {
+            game.pieceOptions = [createPiece(), createPiece()];
+            drawNextPieces();
+        }
+        
+        function createPiece() {
+            const types = Object.keys(PIECES);
+            const type = types[Math.floor(Math.random() * types.length)];
+            return {
+                type: type,
+                shape: PIECES[type][0],
+                rotation: 0,
+                x: Math.floor(COLS / 2) - Math.floor(PIECES[type][0][0].length / 2),
+                y: 0
+            };
+        }
+        
+        function rotatePiece(piece) {
+            const shapes = PIECES[piece.type];
+            const newRotation = (piece.rotation + 1) % shapes.length;
+            return {
+                ...piece,
+                shape: shapes[newRotation],
+                rotation: newRotation
+            };
+        }
+        
+        function isValidMove(piece, dx = 0, dy = 0) {
+            for (let y = 0; y < piece.shape.length; y++) {
+                for (let x = 0; x < piece.shape[y].length; x++) {
+                    if (piece.shape[y][x]) {
+                        const newX = piece.x + x + dx;
+                        const newY = piece.y + y + dy;
+                        
+                        if (newX < 0 || newX >= COLS || newY >= ROWS) {
+                            return false;
+                        }
+                        
+                        if (newY >= 0 && game.board[newY] && game.board[newY][newX]) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        
+        function placePiece() {
+            for (let y = 0; y < game.currentPiece.shape.length; y++) {
+                for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
+                    if (game.currentPiece.shape[y][x]) {
+                        const boardY = game.currentPiece.y + y;
+                        const boardX = game.currentPiece.x + x;
+                        if (boardY >= 0) {
+                            game.board[boardY][boardX] = game.currentPiece.type;
+                        }
+                    }
+                }
+            }
+            
+            // Check for completed lines
+            clearLines();
+            
+            // Check for item drops (double chance)
+            if (Math.random() < game.itemDropChance) {
+                dropItem();
+            }
+            if (Math.random() < game.itemDropChance * 0.5) { // Second chance at half probability
+                dropItem();
+            }
+            
+            // Get next piece
+            game.currentPiece = game.nextPiece;
+            game.nextPiece = createPiece();
+            
+            // Check game over
+            if (!isValidMove(game.currentPiece)) {
+                game.gameOver = true;
+            }
+        }
+        
+        function clearLines() {
+            let linesCleared = 0;
+            
+            for (let y = ROWS - 1; y >= 0; y--) {
+                if (game.board[y].every(cell => cell !== 0)) {
+                    game.board.splice(y, 1);
+                    game.board.unshift(Array(COLS).fill(0));
+                    linesCleared++;
+                    y++; // Check same row again
+                }
+            }
+            
+            if (linesCleared > 0) {
+                const baseScore = [0, 100, 300, 500, 800][linesCleared];
+                let scoreMultiplier = 1;
+                
+                if (game.activeItems.DOUBLE_SCORE) {
+                    scoreMultiplier = 2;
+                }
+                
+                // Combo bonus
+                game.stats.currentCombo = linesCleared;
+                if (game.stats.currentCombo > game.stats.maxCombo) {
+                    game.stats.maxCombo = game.stats.currentCombo;
+                }
+                
+                const comboBonus = game.stats.currentCombo > 1 ? (game.stats.currentCombo - 1) * 50 : 0;
+                const totalScore = (baseScore + comboBonus) * game.level * scoreMultiplier;
+                
+                game.score += totalScore;
+                game.lines += linesCleared;
+                game.stats.totalLines += linesCleared;
+                
+                // Gain experience
+                gainExperience(linesCleared * 20 + comboBonus);
+                
+                checkAchievements();
+                updateDisplay();
+            } else {
+                game.stats.currentCombo = 0;
+            }
+        }
+        
+        function dropItem() {
+            const itemTypes = Object.keys(ITEMS);
+            const randomItem = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+            
+            // Find empty spots in bottom rows for item placement
+            const emptySpots = [];
+            for (let y = ROWS - 5; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    if (game.board[y][x] === 0) {
+                        emptySpots.push({x, y});
+                    }
+                }
+            }
+            
+            if (emptySpots.length > 0) {
+                const spot = emptySpots[Math.floor(Math.random() * emptySpots.length)];
+                game.board[spot.y][spot.x] = 'item_' + randomItem;
+                
+                showItemNotification(ITEMS[randomItem].name + ' Available!');
+            }
+        }
+        
+        function activateItem(itemType) {
+            const item = ITEMS[itemType];
+            
+            switch(itemType) {
+                case 'CLEAR_LINE':
+                    // Clear bottom line
+                    for (let y = ROWS - 1; y >= 0; y--) {
+                        if (game.board[y].some(cell => cell !== 0 && !cell.toString().startsWith('item_'))) {
+                            game.board.splice(y, 1);
+                            game.board.unshift(Array(COLS).fill(0));
+                            game.score += 50 * game.level;
+                            game.stats.currentCombo++;
+                            checkAchievements();
+                            break;
+                        }
+                    }
+                    showItemNotification('Line Cleared!');
+                    break;
+                    
+                case 'DOUBLE_SCORE':
+                    game.activeItems.DOUBLE_SCORE = Date.now() + 15000; // 15 seconds
+                    showItemNotification('Double Score Active!');
+                    break;
+            }
+            
+            game.stats.totalItems++;
+            checkAchievements();
+        }
+        
+        function showItemNotification(message) {
+            const notification = document.getElementById('itemNotification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+        
+        function showAchievementNotification(message) {
+            const notification = document.getElementById('achievementNotification');
+            notification.textContent = 'ACHIEVEMENT: ' + message;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+        
+        function checkAchievements() {
+            // First Line
+            if (!game.achievements.firstLine && game.lines >= 1) {
+                game.achievements.firstLine = true;
+                game.score += 500;
+                showAchievementNotification('First Line! (+500 pts)');
+            }
+            
+            // Tetris (4 lines at once)
+            if (!game.achievements.tetris && game.stats.currentCombo >= 4) {
+                game.achievements.tetris = true;
+                game.score += 2000;
+                showAchievementNotification('TETRIS! (+2000 pts)');
+            }
+            
+            // Speed Demon (reach level 5)
+            if (!game.achievements.speedDemon && game.level >= 5) {
+                game.achievements.speedDemon = true;
+                game.score += 1500;
+                showAchievementNotification('Speed Demon! (+1500 pts)');
+            }
+            
+            // Item Collector (collect 10 items)
+            if (!game.achievements.itemCollector && game.stats.totalItems >= 10) {
+                game.achievements.itemCollector = true;
+                game.score += 1000;
+                showAchievementNotification('Item Collector! (+1000 pts)');
+            }
+            
+            // Perfect Start (100 points in first minute)
+            const playtime = (Date.now() - game.stats.startTime) / 1000;
+            if (!game.achievements.perfectStart && game.score >= 1000 && playtime < 60) {
+                game.achievements.perfectStart = true;
+                game.score += 800;
+                showAchievementNotification('Perfect Start! (+800 pts)');
+            }
+            
+            // Centurion (clear 100 lines)
+            if (!game.achievements.centurion && game.lines >= 100) {
+                game.achievements.centurion = true;
+                game.score += 5000;
+                showAchievementNotification('Centurion! (+5000 pts)');
+            }
+            
+            // Survivor (play for 10 minutes)
+            if (!game.achievements.survivor && playtime >= 600) {
+                game.achievements.survivor = true;
+                game.score += 3000;
+                showAchievementNotification('Survivor! (+3000 pts)');
+            }
+            
+            // Shape Master (use all 8 piece types at least 5 times each)
+            if (!game.achievements.shapeMaster) {
+                const allTypesUsed = Object.values(game.stats.piecesUsed).every(count => count >= 5);
+                if (allTypesUsed) {
+                    game.achievements.shapeMaster = true;
+                    game.score += 2500;
+                    showAchievementNotification('Shape Master! (+2500 pts)');
+                }
+            }
+        }
+        
+        function gainExperience(amount) {
+            game.experience += amount;
+            
+            const expNeeded = game.level * 100;
+            if (game.experience >= expNeeded) {
+                game.level++;
+                game.experience = 0;
+                game.dropInterval = Math.max(50, 1000 - (game.level - 1) * 60);
+                
+                // Level up bonus
+                const levelBonus = game.level * 200;
+                game.score += levelBonus;
+                showAchievementNotification(`Level Up! +${levelBonus} pts`);
+                
+                checkAchievements();
+            }
+        }
+        
+        function updateActiveItems() {
+            const now = Date.now();
+            Object.keys(game.activeItems).forEach(item => {
+                if (game.activeItems[item] < now) {
+                    delete game.activeItems[item];
+                }
+            });
+        }
+        
+        function moveLeft() {
+            if (game.currentPiece && isValidMove(game.currentPiece, -1, 0)) {
+                game.currentPiece.x--;
+            }
+        }
+        
+        function moveRight() {
+            if (game.currentPiece && isValidMove(game.currentPiece, 1, 0)) {
+                game.currentPiece.x++;
+            }
+        }
+        
+        function rotate() {
+            if (game.currentPiece) {
+                const rotated = rotatePiece(game.currentPiece);
+                if (isValidMove(rotated)) {
+                    game.currentPiece = rotated;
+                }
+            }
+        }
+        
+        function softDrop() {
+            if (game.currentPiece && isValidMove(game.currentPiece, 0, 1)) {
+                game.currentPiece.y++;
+                game.score += 1;
+            }
+        }
+        
+        function hardDrop() {
+            if (game.currentPiece) {
+                while (isValidMove(game.currentPiece, 0, 1)) {
+                    game.currentPiece.y++;
+                    game.score += 2;
+                }
+                placePiece();
+            }
+        }
+        
+        function getGhostPosition() {
+            if (!game.currentPiece) return 0;
+            let ghostY = game.currentPiece.y;
+            while (isValidMove({...game.currentPiece, y: ghostY + 1})) {
+                ghostY++;
+            }
+            return ghostY;
+        }
+        
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= COLS; x++) {
+                ctx.beginPath();
+                ctx.moveTo(x * BLOCK_SIZE, 0);
+                ctx.lineTo(x * BLOCK_SIZE, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= ROWS; y++) {
+                ctx.beginPath();
+                ctx.moveTo(0, y * BLOCK_SIZE);
+                ctx.lineTo(canvas.width, y * BLOCK_SIZE);
+                ctx.stroke();
+            }
+            
+            // Draw placed blocks
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    if (game.board[y][x]) {
+                        if (game.board[y][x].toString().startsWith('item_')) {
+                            // Draw item
+                            const itemType = game.board[y][x].replace('item_', '');
+                            ctx.fillStyle = COLORS.item;
+                            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                            ctx.strokeStyle = '#ffffff';
+                            ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                            
+                            // Draw item symbol
+                            ctx.fillStyle = '#000000';
+                            ctx.font = '20px Orbitron';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(ITEMS[itemType].symbol, 
+                                x * BLOCK_SIZE + BLOCK_SIZE/2, 
+                                y * BLOCK_SIZE + BLOCK_SIZE/2 + 7);
+                        } else {
+                            // Draw regular block
+                            ctx.fillStyle = COLORS[game.board[y][x]];
+                            ctx.fillRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+                            
+                            // Glow effect
+                            ctx.shadowColor = COLORS[game.board[y][x]];
+                            ctx.shadowBlur = 10;
+                            ctx.strokeStyle = COLORS[game.board[y][x]];
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+                            
+                            // Reset shadow
+                            ctx.shadowBlur = 0;
+                        }
+                    }
+                }
+            }
+            
+            // Draw ghost piece
+            if (game.currentPiece) {
+                const ghostY = getGhostPosition();
+                if (ghostY !== game.currentPiece.y) {
+                    for (let y = 0; y < game.currentPiece.shape.length; y++) {
+                        for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
+                            if (game.currentPiece.shape[y][x]) {
+                                const blockX = game.currentPiece.x + x;
+                                const blockY = ghostY + y;
+                                if (blockY >= 0) {
+                                    ctx.fillStyle = COLORS.ghost;
+                                    ctx.fillRect(blockX * BLOCK_SIZE, blockY * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                                    ctx.strokeStyle = COLORS.ghost;
+                                    ctx.strokeRect(blockX * BLOCK_SIZE, blockY * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Draw current piece
+            if (game.currentPiece) {
+                for (let y = 0; y < game.currentPiece.shape.length; y++) {
+                    for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
+                        if (game.currentPiece.shape[y][x]) {
+                            const blockX = game.currentPiece.x + x;
+                            const blockY = game.currentPiece.y + y;
+                            if (blockY >= 0) {
+                                let alpha = game.activeItems.GHOST_PIECE ? 0.5 : 1;
+                                drawBlock(blockX, blockY, COLORS[game.currentPiece.type], alpha);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Draw next pieces
+            drawNextPieces();
+        }
+        
+        function drawNextPieces() {
+            const canvas1 = document.getElementById('nextCanvas1');
+            const canvas2 = document.getElementById('nextCanvas2');
+            const ctx1 = canvas1.getContext('2d');
+            const ctx2 = canvas2.getContext('2d');
+            
+            // Draw both piece options
+            [ctx1, ctx2].forEach((ctx, index) => {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(0, 0, 60, 60);
+                
+                if (game.pieceOptions[index]) {
+                    const piece = game.pieceOptions[index];
+                    const blockSize = Math.min(
+                        Math.floor(50 / Math.max(piece.shape[0].length, piece.shape.length)),
+                        12
+                    );
+                    const offsetX = (60 - piece.shape[0].length * blockSize) / 2;
+                    const offsetY = (60 - piece.shape.length * blockSize) / 2;
+                    
+                    for (let y = 0; y < piece.shape.length; y++) {
+                        for (let x = 0; x < piece.shape[y].length; x++) {
+                            if (piece.shape[y][x]) {
+                                ctx.fillStyle = COLORS[piece.type];
+                                ctx.fillRect(
+                                    offsetX + x * blockSize, 
+                                    offsetY + y * blockSize, 
+                                    blockSize - 1, 
+                                    blockSize - 1
+                                );
+                                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                                ctx.strokeRect(
+                                    offsetX + x * blockSize, 
+                                    offsetY + y * blockSize, 
+                                    blockSize - 1, 
+                                    blockSize - 1
+                                );
+                            }
+                        }
+                    }
+                }
+            });
+        }
+            // Main block
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = color;
+            ctx.fillRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+            
+            // Glow effect
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+            
+            // Reset shadow
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+        }
+        
+        function updateDisplay() {
+            document.getElementById('score').textContent = game.score.toLocaleString();
+            document.getElementById('level').textContent = game.level;
+            document.getElementById('lines').textContent = game.lines;
+            document.getElementById('experience').textContent = game.experience;
+            document.getElementById('expNeeded').textContent = game.level * 100;
+            document.getElementById('combo').textContent = game.stats.currentCombo;
+        }
+        
+        function gameLoop() {
+            if (!game.paused && !game.gameOver && game.currentPiece) {
+                const now = Date.now();
+                
+                // Update active items
+                updateActiveItems();
+                
+                // Apply time slow effect
+                let currentDropInterval = game.dropInterval;
+                
+                if (now - game.dropTime > currentDropInterval) {
+                    if (isValidMove(game.currentPiece, 0, 1)) {
+                        game.currentPiece.y++;
+                    } else {
+                        placePiece();
+                    }
+                    game.dropTime = now;
+                }
+                
+                draw();
+                updateDisplay();
+            } else if (!game.currentPiece && game.pieceOptions.length > 0) {
+                // Waiting for piece selection
+                draw();
+                updateDisplay();
+                drawNextPieces();
+            }
+            
+            // Event handlers
+        document.addEventListener('keydown', (e) => {
+            if (game.gameOver) return;
+            
+            switch(e.key.toLowerCase()) {
+                case 'a':
+                case 'arrowleft':
+                    if (!game.paused) moveLeft();
+                    break;
+                case 'd':
+                case 'arrowright':
+                    if (!game.paused) moveRight();
+                    break;
+                case 'w':
+                case 'arrowup':
+                    if (!game.paused) rotate();
+                    break;
+                case 's':
+                case 'arrowdown':
+                    if (!game.paused) softDrop();
+                    break;
+                case ' ':
+                    if (!game.paused) {
+                        e.preventDefault();
+                        hardDrop();
+                    }
+                    break;
+                case 'p':
+                    game.paused = !game.paused;
+                    document.getElementById('pauseOverlay').style.display = game.paused ? 'flex' : 'none';
+                    break;
+            }
+        });
+        
+        // Check for item collection
+        function checkItemCollection() {
+            if (!game.currentPiece) return;
+            
+            for (let y = 0; y < game.currentPiece.shape.length; y++) {
+                for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
+                    if (game.currentPiece.shape[y][x]) {
+                        const boardY = game.currentPiece.y + y;
+                        const boardX = game.currentPiece.x + x;
+                        
+                        if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
+                            const cell = game.board[boardY][boardX];
+                            if (cell && cell.toString().startsWith('item_')) {
+                                const itemType = cell.replace('item_', '');
+                                game.board[boardY][boardX] = 0;
+                                activateItem(itemType);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Mobile controls
+        document.getElementById('moveLeft').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) moveLeft();
+        });
+        
+        document.getElementById('moveRight').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) moveRight();
+        });
+        
+        document.getElementById('rotate').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) rotate();
+        });
+        
+        document.getElementById('softDrop').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) softDrop();
+        });
+        
+        document.getElementById('hardDrop').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) hardDrop();
+        });
+        
+        // Touch controls for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+        
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (game.paused || game.gameOver) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+            
+            const minSwipeDistance = 30;
+            
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Horizontal swipe
+                if (Math.abs(dx) > minSwipeDistance) {
+                    if (dx > 0) {
+                        moveRight();
+                    } else {
+                        moveLeft();
+                    }
+                }
+            } else {
+                // Vertical swipe
+                if (Math.abs(dy) > minSwipeDistance) {
+                    if (dy > 0) {
+                        hardDrop();
+                    } else {
+                        rotate();
+                    }
+                }
+            }
+        });
+        
+        function showGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#ff0080';
+            ctx.font = '48px Orbitron';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ff0080';
+            ctx.shadowBlur = 20;
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+            
+            ctx.fillStyle = '#00ffff';
+            ctx.font = '24px Orbitron';
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 10;
+            ctx.fillText('Final Score: ' + game.score.toLocaleString(), canvas.width / 2, canvas.height / 2 + 20);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '18px Orbitron';
+            ctx.shadowBlur = 5;
+            ctx.fillText('Press R to Restart', canvas.width / 2, canvas.height / 2 + 60);
+            
+            ctx.shadowBlur = 0;
+        }
+        
+        // Prevent scrolling on mobile
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Enhanced piece placement with item collection
+        function placePiece() {
+            // Check for item collection before placing
+            checkItemCollection();
+            
+            // Track piece usage
+            game.stats.piecesUsed[game.currentPiece.type]++;
+            
+            for (let y = 0; y < game.currentPiece.shape.length; y++) {
+                for (let x = 0; x < game.currentPiece.shape[y].length; x++) {
+                    if (game.currentPiece.shape[y][x]) {
+                        const boardY = game.currentPiece.y + y;
+                        const boardX = game.currentPiece.x + x;
+                        if (boardY >= 0) {
+                            game.board[boardY][boardX] = game.currentPiece.type;
+                        }
+                    }
+                }
+            }
+            
+            // Check for completed lines
+            clearLines();
+            
+            // Check for item drops (double chance system)
+            if (Math.random() < game.itemDropChance) {
+                dropItem();
+            }
+            if (Math.random() < game.itemDropChance * 0.5) { // Second chance at half probability
+                dropItem();
+            }
+            
+            // Clear current piece and generate new options
+            game.currentPiece = null;
+            generatePieceOptions();
+            
+            // Reset piece selection borders
+            document.getElementById('nextCanvas1').style.borderColor = '#00ffff';
+            document.getElementById('nextCanvas2').style.borderColor = '#555';
+        }
+        
+        function selectPiece(index) {
+            if (game.gameOver || game.paused || game.currentPiece) return;
+            
+            game.currentPiece = game.pieceOptions[index];
+            
+            // Reset drop timer
+            game.dropTime = Date.now();
+            
+            // Highlight selected piece
+            updatePieceSelection(index);
+            
+            checkAchievements();
+            
+            // Check game over immediately after selection
+            if (!isValidMove(game.currentPiece)) {
+                game.gameOver = true;
+                showGameOver();
+            }
+        }
+        
+        function updatePieceSelection(selectedIndex) {
+            const canvas1 = document.getElementById('nextCanvas1');
+            const canvas2 = document.getElementById('nextCanvas2');
+            
+            if (selectedIndex === 0) {
+                canvas1.style.borderColor = '#00ff00';
+                canvas2.style.borderColor = '#555';
+            } else {
+                canvas1.style.borderColor = '#555';
+                canvas2.style.borderColor = '#00ff00';
+            }
+        }
+        
+        function showGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#ff0080';
+            ctx.font = '48px Orbitron';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ff0080';
+            ctx.shadowBlur = 20;
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+            
+            ctx.fillStyle = '#00ffff';
+            ctx.font = '24px Orbitron';
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 10;
+            ctx.fillText('Final Score: ' + game.score.toLocaleString(), canvas.width / 2, canvas.height / 2 + 20);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '18px Orbitron';
+            ctx.shadowBlur = 5;
+            ctx.fillText('Press R to Restart', canvas.width / 2, canvas.height / 2 + 60);
+            
+            ctx.shadowBlur = 0;
+        }
+        
+        // Restart game
+        function restartGame() {
+            game = {
+                board: [],
+                currentPiece: null,
+                nextPiece: null,
+                score: 0,
+                level: 1,
+                lines: 0,
+                dropTime: 0,
+                dropInterval: 1000,
+                paused: false,
+                gameOver: false,
+                activeItems: {},
+                itemDropChance: 0.3,
+                experience: 0,
+                levelProgress: 0,
+                achievements: {
+                    firstLine: false,
+                    tetris: false,
+                    speedDemon: false,
+                    itemCollector: false,
+                    perfectStart: false,
+                    centurion: false,
+                    survivor: false
+                },
+                stats: {
+                    totalLines: 0,
+                    totalItems: 0,
+                    maxCombo: 0,
+                    currentCombo: 0,
+                    playtime: 0,
+                    startTime: Date.now()
+                }
+            };
+            
+            init();
+        }
+        
+        // Add restart functionality
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'r' && game.gameOver) {
+                restartGame();
+            }
+        });
+        
+        // Controls panel toggle
+        document.getElementById('controlsPanel').addEventListener('click', () => {
+            const panel = document.getElementById('controlsPanel');
+            panel.classList.toggle('hidden');
+        });
+        
+        // Piece selection handlers
+        document.getElementById('nextCanvas1').addEventListener('click', () => {
+            selectPiece(0);
+        });
+        
+        document.getElementById('nextCanvas2').addEventListener('click', () => {
+            selectPiece(1);
+        });
+        
+        // Mobile piece selection
+        document.getElementById('nextCanvas1').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            selectPiece(0);
+        });
+        
+        document.getElementById('nextCanvas2').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            selectPiece(1);
+        });
+        
+        // Mobile controls
+        document.getElementById('moveLeft').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) moveLeft();
+        });
+        
+        document.getElementById('moveRight').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) moveRight();
+        });
+        
+        document.getElementById('rotate').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) rotate();
+        });
+        
+        document.getElementById('softDrop').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) softDrop();
+        });
+        
+        document.getElementById('hardDrop').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!game.paused && !game.gameOver) hardDrop();
+        });
+        
+        // Touch controls for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+        
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (game.paused || game.gameOver) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+            
+            const minSwipeDistance = 30;
+            
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Horizontal swipe
+                if (Math.abs(dx) > minSwipeDistance) {
+                    if (dx > 0) {
+                        moveRight();
+                    } else {
+                        moveLeft();
+                    }
+                }
+            } else {
+                // Vertical swipe
+                if (Math.abs(dy) > minSwipeDistance) {
+                    if (dy > 0) {
+                        hardDrop();
+                    } else {
+                        rotate();
+                    }
+                }
+            }
+        });
+        
+        // Prevent scrolling on mobile
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Initialize game when page loads
+        init();
+    </script>
+</body>
+</html>
