@@ -101,9 +101,43 @@
         .next-piece {
             width: 80px;
             height: 80px;
-            border: 1px solid #555;
+            border: 2px solid #555;
             background: rgba(0, 0, 0, 0.5);
-            margin: 10px 0;
+            margin: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .next-piece:hover {
+            border-color: #00ffff;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        .next-piece.selected {
+            border-color: #00ff00;
+            box-shadow: 0 0 15px #00ff00;
+        }
+        
+        .next-options {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .selection-timer {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .selection-timer-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0080, #ffff00);
+            border-radius: 2px;
+            transition: width 0.1s linear;
         }
         
         .controls {
@@ -264,6 +298,25 @@
             box-shadow: 0 0 15px #00ffff;
         }
         
+        .overlay-input {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            color: #00ffff;
+            font-family: 'Orbitron', monospace;
+            font-size: 16px;
+            padding: 10px 15px;
+            margin: 10px;
+            text-align: center;
+            text-transform: uppercase;
+            max-width: 200px;
+        }
+        
+        .overlay-input:focus {
+            outline: none;
+            box-shadow: 0 0 15px #00ffff;
+        }
+        
         .options-menu {
             max-width: 400px;
             text-align: left;
@@ -386,6 +439,13 @@
             box-shadow: 0 0 15px #00ffff;
         }
         
+        .sync-status {
+            font-size: 10px;
+            color: #888;
+            margin-top: 5px;
+            text-align: center;
+        }
+        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -429,6 +489,12 @@
                 font-size: 12px;
                 padding: 8px 12px;
             }
+            
+            .next-piece {
+                width: 60px;
+                height: 60px;
+                margin: 3px;
+            }
         }
     </style>
 </head>
@@ -458,8 +524,17 @@
                 </div>
             </div>
             <div class="panel" id="nextPanel">
-                <h3>Next</h3>
-                <canvas class="next-piece" id="nextCanvas" width="60" height="60"></canvas>
+                <h3>Next Options</h3>
+                <div class="next-options">
+                    <canvas class="next-piece" id="nextCanvas1" width="60" height="60"></canvas>
+                    <canvas class="next-piece" id="nextCanvas2" width="60" height="60"></canvas>
+                </div>
+                <div class="selection-timer" id="selectionTimer">
+                    <div class="selection-timer-bar" id="selectionTimerBar"></div>
+                </div>
+                <div style="font-size: 8px; color: #888; margin-top: 5px; text-align: center;">
+                    Click to choose or wait for random
+                </div>
             </div>
         </div>
         
@@ -473,8 +548,9 @@
                 <div class="achievement-ladder" id="achievementLadder"></div>
             </div>
             <div class="panel">
-                <h3>Leaderboard</h3>
+                <h3>Global Leaderboard</h3>
                 <div id="leaderboard"></div>
+                <div class="sync-status" id="syncStatus">Local Storage</div>
             </div>
         </div>
     </div>
@@ -507,6 +583,10 @@
             <span>Options:</span>
             <span class="key">O</span>
         </div>
+        <div class="control-item">
+            <span>Select:</span>
+            <span><span class="key">1</span><span class="key">2</span></span>
+        </div>
     </div>
     
     <div class="mobile-controls">
@@ -528,6 +608,20 @@
         </div>
     </div>
     
+    <!-- Name Entry Overlay -->
+    <div class="overlay" id="nameEntryOverlay">
+        <div class="overlay-content">
+            <div class="overlay-title" style="font-size: 36px;">NEW HIGH SCORE!</div>
+            <div class="overlay-text" id="newScoreText">Score: 0</div>
+            <div class="overlay-text">Enter your name:</div>
+            <input type="text" class="overlay-input" id="playerNameInput" maxlength="8" placeholder="PLAYER" />
+            <div>
+                <button class="overlay-button" onclick="submitScore()">SUBMIT</button>
+                <button class="overlay-button" onclick="skipNameEntry()">SKIP</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Game Over Overlay -->
     <div class="overlay" id="gameOverOverlay">
         <div class="overlay-content">
@@ -545,8 +639,8 @@
             <div class="overlay-title" style="font-size: 36px;">OPTIONS</div>
             
             <div class="option-item">
-                <span>Show Next Piece</span>
-                <div class="toggle-switch active" id="showNextToggle">
+                <span>Piece Selection System</span>
+                <div class="toggle-switch active" id="pieceSelectionToggle">
                     <div class="toggle-slider"></div>
                 </div>
             </div>
@@ -573,6 +667,7 @@
             </div>
             
             <div style="text-align: center; margin-top: 20px;">
+                <button class="overlay-button" onclick="clearLeaderboard()">CLEAR LEADERBOARD</button>
                 <button class="overlay-button" onclick="closeOptions()">CLOSE</button>
                 <button class="overlay-button" onclick="restartGame()">RESTART GAME</button>
             </div>
@@ -582,16 +677,15 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const nextCanvas = document.getElementById('nextCanvas');
-        const nextCtx = nextCanvas.getContext('2d');
         
         const COLS = 10;
         const ROWS = 20;
         const BLOCK_SIZE = 30;
+        const SELECTION_TIME = 3000; // 3 seconds to choose
         
         // Game settings
         let settings = {
-            showNext: true,
+            pieceSelection: true,
             showGhost: true,
             showGrid: true,
             showAchievements: true
@@ -611,7 +705,7 @@
             item: '#ffffff'
         };
         
-        // Tetris pieces (removed X piece)
+        // Tetris pieces
         const PIECES = {
             I: [
                 [[1,1,1,1]],
@@ -702,19 +796,39 @@
             { id: 'legend', name: 'Legend', desc: '50000 points', target: 50000, current: 0, type: 'score', reward: 10000, unlocked: false }
         ];
         
-        // In-memory leaderboard
-        let leaderboard = [
-            { name: 'NEXUS', score: 45000, level: 12 },
-            { name: 'CYBER', score: 38500, level: 10 },
-            { name: 'VOID', score: 32000, level: 9 },
-            { name: 'NEON', score: 28750, level: 8 },
-            { name: 'GHOST', score: 25000, level: 7 }
-        ];
+        // Load leaderboard from localStorage
+        function loadLeaderboard() {
+            const stored = localStorage.getItem('cyberpunk-tetris-leaderboard');
+            if (stored) {
+                return JSON.parse(stored);
+            }
+            return [
+                { name: 'NEXUS', score: 45000, level: 12 },
+                { name: 'CYBER', score: 38500, level: 10 },
+                { name: 'VOID', score: 32000, level: 9 },
+                { name: 'NEON', score: 28750, level: 8 },
+                { name: 'GHOST', score: 25000, level: 7 }
+            ];
+        }
+        
+        // Save leaderboard to localStorage
+        function saveLeaderboard() {
+            localStorage.setItem('cyberpunk-tetris-leaderboard', JSON.stringify(leaderboard));
+            document.getElementById('syncStatus').textContent = 'Saved to Local Storage';
+            setTimeout(() => {
+                document.getElementById('syncStatus').textContent = 'Local Storage';
+            }, 2000);
+        }
+        
+        let leaderboard = loadLeaderboard();
         
         let game = {
             board: [],
             currentPiece: null,
-            nextPiece: null,
+            pieceOptions: [], // Two piece options
+            selectionTime: 0,
+            selectionStartTime: 0,
+            waitingForSelection: false,
             dropTime: 0,
             dropInterval: 1000,
             paused: false,
@@ -742,9 +856,16 @@
             game.board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
             
             // Create first piece
-            game.currentPiece = createPiece();
-            game.nextPiece = createPiece();
-            game.dropTime = Date.now();
+            if (settings.pieceSelection) {
+                // Start with piece selection
+                game.currentPiece = null;
+                generatePieceOptions();
+                startPieceSelection();
+            } else {
+                // Start with single random piece
+                game.currentPiece = createPiece();
+                game.dropTime = Date.now();
+            }
             
             // Initialize achievement progress
             resetAchievementProgress();
@@ -766,6 +887,72 @@
                 x: Math.floor(COLS / 2) - Math.floor(PIECES[type][0][0].length / 2),
                 y: 0
             };
+        }
+        
+        function generatePieceOptions() {
+            game.pieceOptions = [createPiece(), createPiece()];
+            drawPieceOptions();
+        }
+        
+        function startPieceSelection() {
+            game.waitingForSelection = true;
+            game.selectionStartTime = Date.now();
+            updateSelectionTimer();
+        }
+        
+        function updateSelectionTimer() {
+            if (!game.waitingForSelection) return;
+            
+            const elapsed = Date.now() - game.selectionStartTime;
+            const progress = Math.min(elapsed / SELECTION_TIME, 1);
+            
+            const timerBar = document.getElementById('selectionTimerBar');
+            if (timerBar) {
+                timerBar.style.width = (progress * 100) + '%';
+            }
+            
+            if (progress >= 1) {
+                // Time's up, pick random piece
+                selectPiece(Math.floor(Math.random() * 2));
+            }
+        }
+        
+        function selectPiece(index) {
+            if (!game.waitingForSelection || index < 0 || index >= game.pieceOptions.length) return;
+            
+            game.currentPiece = game.pieceOptions[index];
+            game.waitingForSelection = false;
+            game.dropTime = Date.now();
+            
+            // Visual feedback
+            highlightSelectedPiece(index);
+            
+            // Check game over immediately after selection
+            if (!isValidMove(game.currentPiece)) {
+                triggerGameOver();
+            }
+        }
+        
+        function highlightSelectedPiece(selectedIndex) {
+            const canvas1 = document.getElementById('nextCanvas1');
+            const canvas2 = document.getElementById('nextCanvas2');
+            
+            // Reset all borders
+            canvas1.classList.remove('selected');
+            canvas2.classList.remove('selected');
+            
+            // Highlight selected
+            if (selectedIndex === 0) {
+                canvas1.classList.add('selected');
+            } else {
+                canvas2.classList.add('selected');
+            }
+            
+            // Remove highlight after a short delay
+            setTimeout(() => {
+                canvas1.classList.remove('selected');
+                canvas2.classList.remove('selected');
+            }, 500);
         }
         
         function rotatePiece(piece) {
@@ -826,19 +1013,32 @@
             }
             
             // Get next piece
-            game.currentPiece = game.nextPiece;
-            game.nextPiece = createPiece();
-            
-            // Check game over
-            if (!isValidMove(game.currentPiece)) {
-                triggerGameOver();
+            game.currentPiece = null;
+            if (settings.pieceSelection) {
+                generatePieceOptions();
+                startPieceSelection();
+            } else {
+                game.currentPiece = createPiece();
+                game.dropTime = Date.now();
+                
+                if (!isValidMove(game.currentPiece)) {
+                    triggerGameOver();
+                }
             }
         }
         
         function triggerGameOver() {
             game.gameOver = true;
-            addToLeaderboard();
-            showGameOver();
+            game.waitingForSelection = false;
+            
+            // Check if this is a high score
+            const isHighScore = leaderboard.length < 10 || game.score > leaderboard[leaderboard.length - 1].score;
+            
+            if (isHighScore) {
+                showNameEntry();
+            } else {
+                showGameOver();
+            }
         }
         
         function clearLines() {
@@ -1033,9 +1233,28 @@
             });
         }
         
-        function addToLeaderboard() {
+        function showNameEntry() {
+            document.getElementById('newScoreText').textContent = `Score: ${game.score.toLocaleString()}`;
+            document.getElementById('nameEntryOverlay').style.display = 'flex';
+            document.getElementById('playerNameInput').focus();
+        }
+        
+        function submitScore() {
+            const playerName = document.getElementById('playerNameInput').value.toUpperCase().trim() || 'PLAYER';
+            addToLeaderboard(playerName);
+            document.getElementById('nameEntryOverlay').style.display = 'none';
+            showGameOver();
+        }
+        
+        function skipNameEntry() {
+            addToLeaderboard('ANON');
+            document.getElementById('nameEntryOverlay').style.display = 'none';
+            showGameOver();
+        }
+        
+        function addToLeaderboard(playerName = 'PLAYER') {
             const playerEntry = {
-                name: 'YOU',
+                name: playerName,
                 score: game.score,
                 level: game.level
             };
@@ -1044,6 +1263,7 @@
             leaderboard.sort((a, b) => b.score - a.score);
             leaderboard = leaderboard.slice(0, 10); // Keep top 10
             
+            saveLeaderboard();
             updateLeaderboardDisplay();
         }
         
@@ -1053,13 +1273,27 @@
             
             leaderboard.forEach((entry, index) => {
                 const div = document.createElement('div');
-                div.className = `leaderboard-entry ${entry.name === 'YOU' ? 'current' : ''}`;
+                div.className = `leaderboard-entry ${entry.name === 'PLAYER' || entry.name === 'ANON' ? 'current' : ''}`;
                 div.innerHTML = `
                     <span>#${index + 1} ${entry.name}</span>
                     <span>L${entry.level} • ${entry.score.toLocaleString()}</span>
                 `;
                 container.appendChild(div);
             });
+        }
+        
+        function clearLeaderboard() {
+            if (confirm('Clear all leaderboard data?')) {
+                leaderboard = [
+                    { name: 'NEXUS', score: 45000, level: 12 },
+                    { name: 'CYBER', score: 38500, level: 10 },
+                    { name: 'VOID', score: 32000, level: 9 },
+                    { name: 'NEON', score: 28750, level: 8 },
+                    { name: 'GHOST', score: 25000, level: 7 }
+                ];
+                saveLeaderboard();
+                updateLeaderboardDisplay();
+            }
         }
         
         function gainExperience(amount) {
@@ -1241,42 +1475,50 @@
             }
         }
         
-        function drawNextPiece() {
-            if (!settings.showNext) return;
+        function drawPieceOptions() {
+            if (!settings.pieceSelection) return;
             
-            nextCtx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-            nextCtx.fillRect(0, 0, 60, 60);
+            const canvas1 = document.getElementById('nextCanvas1');
+            const canvas2 = document.getElementById('nextCanvas2');
+            const ctx1 = canvas1.getContext('2d');
+            const ctx2 = canvas2.getContext('2d');
             
-            if (game.nextPiece) {
-                const piece = game.nextPiece;
-                const blockSize = Math.min(
-                    Math.floor(50 / Math.max(piece.shape[0].length, piece.shape.length)),
-                    12
-                );
-                const offsetX = (60 - piece.shape[0].length * blockSize) / 2;
-                const offsetY = (60 - piece.shape.length * blockSize) / 2;
+            // Draw both piece options
+            [ctx1, ctx2].forEach((ctx, index) => {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(0, 0, 60, 60);
                 
-                for (let y = 0; y < piece.shape.length; y++) {
-                    for (let x = 0; x < piece.shape[y].length; x++) {
-                        if (piece.shape[y][x]) {
-                            nextCtx.fillStyle = COLORS[piece.type];
-                            nextCtx.fillRect(
-                                offsetX + x * blockSize, 
-                                offsetY + y * blockSize, 
-                                blockSize - 1, 
-                                blockSize - 1
-                            );
-                            nextCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                            nextCtx.strokeRect(
-                                offsetX + x * blockSize, 
-                                offsetY + y * blockSize, 
-                                blockSize - 1, 
-                                blockSize - 1
-                            );
+                if (game.pieceOptions[index]) {
+                    const piece = game.pieceOptions[index];
+                    const blockSize = Math.min(
+                        Math.floor(50 / Math.max(piece.shape[0].length, piece.shape.length)),
+                        12
+                    );
+                    const offsetX = (60 - piece.shape[0].length * blockSize) / 2;
+                    const offsetY = (60 - piece.shape.length * blockSize) / 2;
+                    
+                    for (let y = 0; y < piece.shape.length; y++) {
+                        for (let x = 0; x < piece.shape[y].length; x++) {
+                            if (piece.shape[y][x]) {
+                                ctx.fillStyle = COLORS[piece.type];
+                                ctx.fillRect(
+                                    offsetX + x * blockSize, 
+                                    offsetY + y * blockSize, 
+                                    blockSize - 1, 
+                                    blockSize - 1
+                                );
+                                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                                ctx.strokeRect(
+                                    offsetX + x * blockSize, 
+                                    offsetY + y * blockSize, 
+                                    blockSize - 1, 
+                                    blockSize - 1
+                                );
+                            }
                         }
                     }
                 }
-            }
+            });
         }
         
         function updateDisplay() {
@@ -1289,8 +1531,11 @@
         }
         
         function updateUIVisibility() {
-            // Show/hide next piece panel
-            document.getElementById('nextPanel').style.display = settings.showNext ? 'block' : 'none';
+            // Show/hide next piece panel based on piece selection setting
+            const nextPanel = document.getElementById('nextPanel');
+            if (nextPanel) {
+                nextPanel.style.display = settings.pieceSelection ? 'block' : 'none';
+            }
             
             // Show/hide achievement panel
             const achievementPanel = document.querySelector('.info-panel:last-child');
@@ -1300,13 +1545,19 @@
         }
         
         function gameLoop() {
-            if (!game.paused && !game.gameOver && game.currentPiece) {
+            if (!game.paused && !game.gameOver) {
                 const now = Date.now();
                 
                 // Update active items
                 updateActiveItems();
                 
-                if (now - game.dropTime > game.dropInterval) {
+                // Update selection timer if waiting for selection
+                if (game.waitingForSelection && settings.pieceSelection) {
+                    updateSelectionTimer();
+                }
+                
+                // Handle piece dropping
+                if (game.currentPiece && now - game.dropTime > game.dropInterval) {
                     if (isValidMove(game.currentPiece, 0, 1)) {
                         game.currentPiece.y++;
                     } else {
@@ -1318,7 +1569,9 @@
             
             if (!game.gameOver) {
                 draw();
-                drawNextPiece();
+                if (settings.pieceSelection) {
+                    drawPieceOptions();
+                }
                 updateDisplay();
             }
             
@@ -1365,7 +1618,7 @@
         }
         
         function updateOptionsDisplay() {
-            document.getElementById('showNextToggle').className = `toggle-switch ${settings.showNext ? 'active' : ''}`;
+            document.getElementById('pieceSelectionToggle').className = `toggle-switch ${settings.pieceSelection ? 'active' : ''}`;
             document.getElementById('showGhostToggle').className = `toggle-switch ${settings.showGhost ? 'active' : ''}`;
             document.getElementById('showGridToggle').className = `toggle-switch ${settings.showGrid ? 'active' : ''}`;
             document.getElementById('showAchievementsToggle').className = `toggle-switch ${settings.showAchievements ? 'active' : ''}`;
@@ -1375,13 +1628,17 @@
         function restartGame() {
             // Hide all overlays
             document.getElementById('gameOverOverlay').style.display = 'none';
+            document.getElementById('nameEntryOverlay').style.display = 'none';
             document.getElementById('optionsOverlay').style.display = 'none';
             document.getElementById('pauseOverlay').style.display = 'none';
             
             game = {
                 board: [],
                 currentPiece: null,
-                nextPiece: null,
+                pieceOptions: [],
+                selectionTime: 0,
+                selectionStartTime: 0,
+                waitingForSelection: false,
                 score: 0,
                 level: 1,
                 lines: 0,
@@ -1418,6 +1675,17 @@
                 return;
             }
             
+            // Handle piece selection with number keys
+            if (e.key === '1' && game.waitingForSelection) {
+                selectPiece(0);
+                return;
+            }
+            
+            if (e.key === '2' && game.waitingForSelection) {
+                selectPiece(1);
+                return;
+            }
+            
             if (game.gameOver) return;
             
             switch(e.key.toLowerCase()) {
@@ -1447,6 +1715,18 @@
                     game.paused = !game.paused;
                     document.getElementById('pauseOverlay').style.display = game.paused ? 'flex' : 'none';
                     break;
+                case 'enter':
+                    if (document.getElementById('nameEntryOverlay').style.display === 'flex') {
+                        submitScore();
+                    }
+                    break;
+            }
+        });
+        
+        // Name input enter key
+        document.getElementById('playerNameInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                submitScore();
             }
         });
         
@@ -1454,8 +1734,8 @@
         document.getElementById('optionsButton').addEventListener('click', showOptions);
         
         // Toggle switches
-        document.getElementById('showNextToggle').addEventListener('click', () => {
-            settings.showNext = !settings.showNext;
+        document.getElementById('pieceSelectionToggle').addEventListener('click', () => {
+            settings.pieceSelection = !settings.pieceSelection;
             updateOptionsDisplay();
         });
         
@@ -1472,6 +1752,26 @@
         document.getElementById('showAchievementsToggle').addEventListener('click', () => {
             settings.showAchievements = !settings.showAchievements;
             updateOptionsDisplay();
+        });
+        
+        // Piece selection clicks
+        document.getElementById('nextCanvas1').addEventListener('click', () => {
+            selectPiece(0);
+        });
+        
+        document.getElementById('nextCanvas2').addEventListener('click', () => {
+            selectPiece(1);
+        });
+        
+        // Mobile piece selection
+        document.getElementById('nextCanvas1').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            selectPiece(0);
+        });
+        
+        document.getElementById('nextCanvas2').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            selectPiece(1);
         });
         
         // Mobile controls
